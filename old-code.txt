@@ -1,0 +1,72 @@
+#include <DHT.h>
+#include <SPI.h>
+#include <Ethernet.h>
+#define DHTPIN A1
+#define DHTTYPE DHT11
+#define R1 10000
+#define R2 10000
+byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+IPAddress ip(192, 168, 1, 50);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress gateway(192, 168, 1, 1);
+int port = 80;
+DHT dht(DHTPIN, DHTTYPE);
+EthernetServer server(port);
+float temperature;
+float humidity;
+float V;
+int outputPin = 7;
+int outputState = 0;
+int outputStat = 1;
+
+String page = "<html><head><title>Sait Arsad</title></head><body><h1>Sait Arsad</h1><p>Temperature: %TEMP% &deg;C</p><p>Humidity: %HUMID% %</p><p>Voltage: %VOLT% V</p><form><input type='submit' name='on' value='Turn On'><input type='submit' name='off' value='Turn Off'></form></body></html>";
+
+void setup() {
+  Serial.begin(9600);
+  Ethernet.begin(mac, ip, gateway, subnet);
+  server.begin();
+  dht.begin();
+}
+
+void loop() {
+  EthernetClient client = server.available();
+  if (client) {
+    String request = client.readStringUntil('\r');
+    client.flush();
+    if (request.indexOf("GET /?on") != -1) {
+      outputState = 1;
+      digitalWrite(outputPin, HIGH);
+    }
+    if (request.indexOf("GET /?off") != -1) {
+      outputState = 0;
+      digitalWrite(outputPin, LOW);
+    }
+    String html = page;
+    html.replace("%TEMP%", String(temperature));
+    html.replace("%HUMID%", String(humidity));
+    html.replace("%VOLT%", String(V));
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: text/html");
+    client.println("Connection: close");
+    client.println();
+    client.println(html);
+    client.stop();
+  }
+  temperature = dht.readTemperature();
+  humidity = dht.readHumidity();
+  int vol = analogRead(A0);
+  float voltage =  vol * (5.0/1023.0) ;
+  float volta = voltage * (R1 + R2) / R2;
+  float Vss =  (volta * 10);
+  V = Vss/1;
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.println(" *C");
+  Serial.print("Humidity: ");
+  Serial.print(humidity);
+  Serial.println(" %");
+  Serial.print("Voltage: ");
+  Serial.print(V);
+  Serial.println(" V");
+  delay(1000);
+}
